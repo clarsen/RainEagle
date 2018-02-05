@@ -9,14 +9,13 @@ import sys
 import os
 import time
 import xml.etree.ElementTree as ET
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
 import base64
 from math import floor
-from urlparse import urlparse
 import json
 from warnings import warn
 from distutils.version import LooseVersion
+import traceback
 
 min_fw_ver = "2.0.21"
 
@@ -51,7 +50,7 @@ def to_epoch_1970(t) :
         offset in seconds from "Jan 1 00:00:00 2000"
         to unix's epoch of 1970
     """
-    if isinstance(t, (int, long, float)) :
+    if isinstance(t, (int, float)) :
         return t + 946684800
     if isinstance(t, str) and t.startswith('0x') :
         return 946684800 + int(t, 16)
@@ -151,13 +150,13 @@ class Eagle(object) :
     """
     def __init__(self, **kwargs):
 
-        self.username = kwargs.get("username", 0)
-        self.password = kwargs.get("password", 0)
+        self.username = kwargs.get("username", "0")
+        self.password = kwargs.get("password", "0")
         
         self.debug = kwargs.get("debug", 0)
 
         if self.debug :
-            print self.__class__.__name__, __name__
+            print(self.__class__.__name__, __name__)
         self.checkfw = kwargs.get("checkfirmware", True)
         self.addr = kwargs.get("addr", os.getenv('EAGLE_ADDR', None))
         self.port = kwargs.get("port", os.getenv('EAGLE_PORT', 5002))
@@ -168,9 +167,9 @@ class Eagle(object) :
         self.macid = None
 
         if self.debug :
-            print "Addr :  = ", self.addr
-            print "timeout :  = ", self.timeout
-            print "debug :  = ", self.debug
+            print("Addr :  = ", self.addr)
+            print("timeout :  = ", self.timeout)
+            print("debug :  = ", self.debug)
 
 
         if self.addr is None :
@@ -182,11 +181,11 @@ class Eagle(object) :
             if self.device_info is None :
                 raise IOError("Error connecting")
             if self.debug :
-                print "__init__ ",
+                print("__init__ ",)
                 pprint(self.device_info)
             # self.macid = self.device_info['DeviceInfo']['DeviceMacId']
             if self.debug :
-                print "Init DeviceMacId = ", self.macid
+                print("Init DeviceMacId = ", self.macid)
 
         if self.checkfw :
             mysetting = self.get_setting_data()
@@ -209,7 +208,7 @@ class Eagle(object) :
         """
         comm_responce = self._send_soc_comm("list_devices", MacId=macid)
         if self.debug :
-            print "comm_responce =", comm_responce
+            print("comm_responce =", comm_responce)
         if comm_responce is None:
             raise RainEagleResponseError("list_devices : Null reply")
         etree = ET.fromstring('<S>' + comm_responce + '</S>')
@@ -227,7 +226,7 @@ class Eagle(object) :
         if comm_responce is None:
             raise RainEagleResponseError("get_device_data : Null reply")
         if self.debug :
-            print comm_responce
+            print(comm_responce)
         etree = ET.fromstring('<S>' + comm_responce + '</S>')
         rv = _et2d(etree)
         return rv
@@ -473,7 +472,7 @@ class Eagle(object) :
 
         """
         comm_responce = self._send_http_comm("get_usage_data", MacId=macid)
-        return json.loads(comm_responce)
+        return json.loads(comm_responce.decode("utf8"))
 
 
     def get_historical_data(self, macid=None, period="day") :
@@ -531,7 +530,7 @@ class Eagle(object) :
 
         """
         comm_responce = self._send_http_comm("get_setting_data", MacId=macid)
-        return json.loads(comm_responce)
+        return json.loads(comm_responce.decode("utf8"))
 
     def get_device_config(self, macid=None) :
         """
@@ -638,7 +637,7 @@ class Eagle(object) :
             returns empty dict on Error
         """
         comm_responce = self._send_http_comm("get_price", MacId=macid)
-        return json.loads(comm_responce)
+        return json.loads(comm_responce.decode("utf8"))
 
     def set_price(self, macid=None, price=None) :
         """
@@ -737,7 +736,7 @@ class Eagle(object) :
         if url.__len__() > 200 :
             raise ValueError("Max URL length is 200 characters long.\n")
 
-        urlp = urlparse(url)
+        urlp = urllib.parse.urlparse(url)
 
         if urlp.port :
             port = "{:#04x}".format(urlp.port)
@@ -789,7 +788,7 @@ class Eagle(object) :
     def _send_http_comm(self, cmd, **kwargs):
 
         if self.debug :
-            print "\n\n_send_http_comm : ", cmd
+            print("\n\n_send_http_comm : ", cmd)
 
         commstr = "<LocalCommand>\n"
         commstr += "<Name>{0!s}</Name>\n".format(cmd)
@@ -808,12 +807,13 @@ class Eagle(object) :
         url = "http://{0}/cgi-bin/cgi_manager".format(self.addr)
 
         if self.username is not None :
-            if self.debug :
-                print("Authorization string: "+ base64.b64encode(self.username+":"+self.password))
-            req = urllib2.Request(url, commstr, headers={ "Authorization" : 'Basic ' + base64.b64encode(self.username+":"+self.password) })
+            authstr = base64.b64encode(bytes(self.username+":"+self.password, "utf8")).decode("utf8")
+            if self.debug:
+                print("Authorization string:", authstr)
+            req = urllib.request.Request(url, bytes(commstr,"utf8"), headers={ "Authorization" : 'Basic ' + authstr })
         else :
-            req = urllib2.Request(url, commstr)
-        response = urllib2.urlopen(req)
+            req = urllib.request.Request(url, bytes(commstr,"utf8"))
+        response = urllib.request.urlopen(req)
         the_page = response.read()
 
         return the_page
@@ -841,9 +841,9 @@ class Eagle(object) :
 
             # if cmd == "get_history_data" :
         #       self.soc.settimeout(45)
-            self.soc.sendall(commstr)
+            self.soc.sendall(bytes(commstr,'utf-8'))
             if self.debug :
-                print "commstr : \n", commstr
+                print("commstr : \n", commstr)
 
             # time.sleep(1)
 
@@ -851,18 +851,19 @@ class Eagle(object) :
                 buf = self.soc.recv(1000)
                 if not buf:
                     break
-                replystr += buf
+                replystr += buf.decode("utf-8")
                 #buf_list.append(buf)
             # replystr = ''.join(buf_list)
 
         except Exception:
             print("Unexpected error:", sys.exc_info()[0])
-            print "Error replystr = ", replystr
+            print("Error replystr = ", replystr)
+            traceback.print_exc()
             replystr = None
         finally:
             self._disconnect()
             if self.debug > 1 :
-                print "_send_soc_comm replystr :\n", replystr
+                print("_send_soc_comm replystr :\n", replystr)
             return replystr
 
 

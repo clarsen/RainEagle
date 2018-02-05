@@ -14,9 +14,8 @@ __copyright__ = "Copyright (C) 2014 Peter Shipley"
 __license__ = "BSD"
 
 
-import EagleClass
-from EagleClass import Eagle, RainEagleResponseError, to_epoch_1970, to_epoch_2000
-#from RainEagle.EagleClass import Eagle
+#import .EagleClass
+from .EagleClass import Eagle, RainEagleResponseError, to_epoch_1970, to_epoch_2000
 
 __all__ = ['Eagle', 'RainEagleResponseError', 'to_epoch_1970', 'to_epoch_2000']
 

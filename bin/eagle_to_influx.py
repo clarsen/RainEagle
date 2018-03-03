@@ -31,6 +31,12 @@ json_body = [
             "value": r['price_label'],
         }
     },
+    {
+        "measurement": "energy_spend_per_hour",
+        "fields": {
+            "value": float(r['demand']) * float(r['price']),
+        }
+    },
 ]
 
 client.write_points(json_body)
